@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>&#31661;&#22836;&#36855;&#23467;</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="phone">
+      <header class="topbar">
+        <button class="round-button" id="restartBtn" aria-label="&#37325;&#26032;&#24320;&#22987;">
+          <span class="gear"></span>
+        </button>
+        <section class="status" aria-live="polite">
+          <h1>&#20851;&#21345; <span id="levelText">2</span></h1>
+          <div class="hearts" id="hearts"></div>
+          <div class="timer"><span class="clock"></span><span id="timeText">5m00s</span></div>
+        </section>
+        <div class="menu-pill" aria-hidden="true">
+          <span></span><span></span><span></span><i></i>
+        </div>
+      </header>
+
+      <section class="board-wrap" id="boardWrap">
+        <canvas id="gameCanvas" width="900" height="1300" aria-label="&#31661;&#22836;&#36855;&#23467;&#26827;&#30424;"></canvas>
+        <div class="message" id="message"></div>
+      </section>
+
+      <section class="zoom-strip" aria-hidden="true">
+        <span class="zoom-mark">&minus;</span>
+        <span class="zoom-track"><i></i></span>
+        <span class="zoom-mark">+</span>
+      </section>
+
+      <footer class="tools">
+        <button class="tool" id="clearBtn" aria-label="&#28165;&#38500;&#19968;&#20010;&#21487;&#31227;&#21160;&#31661;&#22836;">
+          <span class="eraser"></span><b>+</b>
+        </button>
+        <button class="tool" id="shuffleBtn" aria-label="&#37325;&#25490;&#26041;&#21521;">
+          <span class="wand"></span><b>+</b>
+        </button>
+        <button class="tool" id="hintBtn" aria-label="&#25552;&#31034;">
+          <span class="bulb"></span><b>+</b>
+        </button>
+      </footer>
+    </main>
+
+    <script src="game.js?v=6"></script>
+  </body>
+</html>
