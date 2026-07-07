@@ -17,9 +17,9 @@
           <div class="hearts" id="hearts"></div>
           <div class="timer"><span class="clock"></span><span id="timeText">5m00s</span></div>
         </section>
-        <div class="menu-pill" aria-hidden="true">
+        <button class="menu-pill" id="infoBtn" aria-label="&#31661;&#22836;&#29305;&#28857;">
           <span></span><span></span><span></span><i></i>
-        </div>
+        </button>
       </header>
 
       <section class="board-wrap" id="boardWrap">
@@ -44,8 +44,18 @@
           <span class="bulb"></span><b>+</b>
         </button>
       </footer>
+
+      <section class="info-panel" id="infoPanel" aria-hidden="true">
+        <div class="info-card" role="dialog" aria-labelledby="infoTitle">
+          <button class="close-info" id="closeInfoBtn" aria-label="&#20851;&#38381;">&times;</button>
+          <h2 id="infoTitle">&#31661;&#22836;&#29305;&#28857;</h2>
+          <p>&#27599;&#20010;&#31661;&#22836;&#26159;&#19968;&#26465;&#36830;&#32493;&#25240;&#32447;&#65292;&#31661;&#22836;&#22836;&#37096;&#22987;&#32456;&#27839;&#26368;&#21518;&#19968;&#27573;&#32447;&#30340;&#26041;&#21521;&#24310;&#20280;&#12290;</p>
+          <p>&#28857;&#20987;&#26102;&#65292;&#20250;&#20174;&#31661;&#22836;&#21069;&#26041;&#19968;&#30452;&#26816;&#26597;&#21040;&#36793;&#30028;&#65307;&#22914;&#26524;&#27809;&#26377;&#20854;&#20182;&#31661;&#22836;&#25377;&#20303;&#65292;&#23427;&#23601;&#21487;&#20197;&#28369;&#20986;&#12290;</p>
+          <p>&#31661;&#22836;&#19981;&#20250;&#22312;&#32467;&#23614;&#22788;&#24378;&#34892;&#25240;&#22238;&#65292;&#21482;&#26377;&#33258;&#28982;&#26397;&#22806;&#30340;&#20986;&#21475;&#31661;&#22836;&#33021;&#31163;&#24320;&#12290;</p>
+        </div>
+      </section>
     </main>
 
-    <script src="game.js?v=6"></script>
+    <script src="game.js?v=10"></script>
   </body>
 </html>

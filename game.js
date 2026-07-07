@@ -8,6 +8,9 @@ const restartBtn = document.getElementById("restartBtn");
 const hintBtn = document.getElementById("hintBtn");
 const clearBtn = document.getElementById("clearBtn");
 const shuffleBtn = document.getElementById("shuffleBtn");
+const infoBtn = document.getElementById("infoBtn");
+const infoPanel = document.getElementById("infoPanel");
+const closeInfoBtn = document.getElementById("closeInfoBtn");
 
 const COLS = 14;
 const ROWS = 21;
@@ -97,11 +100,12 @@ function growPath(start, targetLength, occupied, rand) {
 
     if (!choices.length) break;
     const picked = choices[0];
-    path.push({ col: here.col + picked.x, row: here.row + picked.y });
-    used.add(keyOf(here.col + picked.x, here.row + picked.y));
+    const next = { col: here.col + picked.x, row: here.row + picked.y };
+    path.push(next);
+    used.add(keyOf(next.col, next.row));
     previousDir = picked.name;
 
-    if (path.length >= 3 && touchesExit(path[path.length - 1], picked.name) && rand() < 0.42) break;
+    if (path.length >= 2 && outwardDirection(next)) break;
   }
 
   return path;
@@ -125,9 +129,13 @@ function fillSmallGaps(occupied, rand) {
 }
 
 function addArrow(path, occupied) {
+  if (!pathExitDirection(path) && pathStartExitDirection(path)) {
+    path = path.slice().reverse();
+  }
+
   const head = path[path.length - 1];
   const beforeHead = path[path.length - 2];
-  const dir = directionBetween(beforeHead, head);
+  const dir = pathExitDirection(path) ?? directionBetween(beforeHead, head);
   const arrow = {
     id: nextId,
     path,
@@ -160,20 +168,53 @@ function touchesExit(cell, dir) {
   );
 }
 
+function pathExitDirection(path) {
+  if (path.length < 2) return null;
+  const head = path[path.length - 1];
+  const beforeHead = path[path.length - 2];
+  const dir = directionBetween(beforeHead, head);
+  return touchesExit(head, dir) ? dir : null;
+}
+
+function pathStartExitDirection(path) {
+  if (path.length < 2) return null;
+  const head = path[0];
+  const beforeHead = path[1];
+  const dir = directionBetween(beforeHead, head);
+  return touchesExit(head, dir) ? dir : null;
+}
+
 function makeSureThereAreOpenMoves() {
   if (arrows.some((arrow) => !arrow.removed && !arrow.exiting && canExit(arrow).ok)) return;
 
-  const candidate = activeArrows().find((arrow) => {
-    const head = getHead(arrow);
-    return head.row === 0 || head.row === ROWS - 1 || head.col === 0 || head.col === COLS - 1;
-  });
+  if (promoteBoundarySegmentToExit()) return;
+}
 
-  if (!candidate) return;
-  const head = getHead(candidate);
-  if (head.row === 0) candidate.dir = "up";
-  else if (head.row === ROWS - 1) candidate.dir = "down";
-  else if (head.col === 0) candidate.dir = "left";
-  else candidate.dir = "right";
+function promoteBoundarySegmentToExit() {
+  for (const arrow of activeArrows()) {
+    const boundaryIndex = arrow.path.findIndex((cell, index) => {
+      if (index === 0) return false;
+      const dir = directionBetween(arrow.path[index - 1], cell);
+      return touchesExit(cell, dir);
+    });
+    if (boundaryIndex < 0) continue;
+
+    arrow.path = arrow.path.slice(0, boundaryIndex + 1);
+
+    refreshArrowShape(arrow);
+    if (canExit(arrow).ok) return true;
+  }
+
+  return false;
+}
+
+function refreshArrowShape(arrow) {
+  const head = getHead(arrow);
+  const beforeHead = arrow.path[arrow.path.length - 2];
+  arrow.cells = arrow.path.map((cell) => keyOf(cell.col, cell.row));
+  arrow.col = head.col;
+  arrow.row = head.row;
+  arrow.dir = pathExitDirection(arrow.path) ?? directionBetween(beforeHead, head);
 }
 
 function boardMetrics() {
@@ -428,6 +469,16 @@ function hideMessage() {
   messageEl.classList.remove("show");
 }
 
+function openInfo() {
+  infoPanel.classList.add("show");
+  infoPanel.setAttribute("aria-hidden", "false");
+}
+
+function closeInfo() {
+  infoPanel.classList.remove("show");
+  infoPanel.setAttribute("aria-hidden", "true");
+}
+
 function showHint() {
   if (gameOver) return;
   const open = activeArrows().find((arrow) => canExit(arrow).ok);
@@ -447,11 +498,8 @@ function shuffleDirections() {
   if (gameOver) return;
   const active = activeArrows();
   for (const arrow of active) {
-    const head = getHead(arrow);
     const beforeHead = arrow.path[arrow.path.length - 2];
-    const natural = directionBetween(beforeHead, head);
-    const outward = outwardDirection(head);
-    arrow.dir = outward ?? natural;
+    arrow.dir = pathExitDirection(arrow.path) ?? directionBetween(beforeHead, getHead(arrow));
   }
   makeSureThereAreOpenMoves();
   showMessage("\u65b9\u5411\u5df2\u91cd\u6392");
@@ -502,6 +550,11 @@ restartBtn.addEventListener("click", () => {
 hintBtn.addEventListener("click", showHint);
 clearBtn.addEventListener("click", clearOne);
 shuffleBtn.addEventListener("click", shuffleDirections);
+infoBtn.addEventListener("click", openInfo);
+closeInfoBtn.addEventListener("click", closeInfo);
+infoPanel.addEventListener("click", (event) => {
+  if (event.target === infoPanel) closeInfo();
+});
 
 buildLevel();
 requestAnimationFrame(draw);
