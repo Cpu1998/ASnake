@@ -304,26 +304,58 @@ function drawParticles() {
 }
 
 function drawArrow(arrow, m) {
-  const d = dirs[arrow.dir];
-  const distance = arrow.exiting ? (Math.max(COLS, ROWS) + 2) * m.cell * easeOutCubic(arrow.progress) : 0;
-  const offset = { x: d.x * distance, y: d.y * distance };
-  const points = arrow.path.map((cell) => gridPoint(cell, m, offset));
+  const color = hintId === arrow.id ? GOOD : INK;
+  const lineWidth = hintId === arrow.id ? 10 : 8;
+  let points = arrow.path.map((cell) => gridPoint(cell, m));
+  let headVector = dirs[arrow.dir];
 
   ctx.save();
   ctx.lineCap = "square";
   ctx.lineJoin = "miter";
-  ctx.strokeStyle = hintId === arrow.id ? GOOD : INK;
-  ctx.lineWidth = hintId === arrow.id ? 10 : 8;
+
+  if (arrow.exiting) {
+    const motion = getCrawlMotion(arrow, m, arrow.progress);
+    points = motion.points;
+    headVector = motion.headVector;
+    drawExitTrail(arrow, m, color, lineWidth);
+    ctx.globalAlpha = 1 - smoothstep(0.58, 1, arrow.progress) * 0.55;
+    ctx.lineWidth = lineWidth * (1 - smoothstep(0.74, 1, arrow.progress) * 0.22);
+  } else {
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = lineWidth;
+  }
+
+  drawArrowPath(points, color);
+  drawHeadVector(points[points.length - 1], headVector, m.cell, color);
+  ctx.restore();
+}
+
+function drawExitTrail(arrow, m, color, lineWidth) {
+  const trailCount = 5;
+  for (let i = trailCount; i >= 1; i -= 1) {
+    const lag = i * 0.045;
+    const progress = Math.max(0, arrow.progress - lag);
+    const points = getCrawlMotion(arrow, m, progress).points;
+    ctx.globalAlpha = (0.13 / i) * (1 - smoothstep(0.68, 1, arrow.progress));
+    ctx.lineWidth = lineWidth + i * 1.15;
+    drawArrowPath(points, color);
+  }
+}
+
+function drawArrowPath(points, color) {
+  ctx.strokeStyle = color;
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
   ctx.stroke();
-  drawHead(points[points.length - 1], arrow.dir, m.cell, hintId === arrow.id ? GOOD : INK);
-  ctx.restore();
 }
 
 function drawHead(point, dir, cell, color) {
-  const d = dirs[dir];
+  drawHeadVector(point, dirs[dir], cell, color);
+}
+
+function drawHeadVector(point, vector, cell, color) {
+  const d = normalizeVector(vector);
   const side = { x: -d.y, y: d.x };
   const length = cell * 0.28;
   const spread = cell * 0.16;
@@ -336,6 +368,90 @@ function drawHead(point, dir, cell, color) {
   ctx.lineTo(tip.x, tip.y);
   ctx.lineTo(base.x - side.x * spread, base.y - side.y * spread);
   ctx.stroke();
+}
+
+function getCrawlMotion(arrow, m, progress) {
+  const route = buildExitRoute(arrow, m);
+  const eased = easeInOutCubic(progress);
+  const travel = route.exitDistance * eased;
+  const points = route.baseDistances.map((distance) => pointOnRoute(route, distance + travel).point);
+  const head = pointOnRoute(route, route.baseDistances[route.baseDistances.length - 1] + travel);
+  return { points, headVector: head.vector };
+}
+
+function buildExitRoute(arrow, m) {
+  const basePoints = arrow.path.map((cell) => gridPoint(cell, m));
+  const cumulative = [0];
+  for (let i = 1; i < basePoints.length; i += 1) {
+    cumulative.push(cumulative[i - 1] + distanceBetween(basePoints[i - 1], basePoints[i]));
+  }
+
+  const d = dirs[arrow.dir];
+  const pathLength = cumulative[cumulative.length - 1];
+  const extension = pathLength + (Math.max(COLS, ROWS) + 4) * m.cell;
+  const head = basePoints[basePoints.length - 1];
+  const exitPoint = { x: head.x + d.x * extension, y: head.y + d.y * extension };
+  const points = [...basePoints, exitPoint];
+  const distances = [...cumulative, pathLength + extension];
+
+  return {
+    points,
+    distances,
+    baseDistances: cumulative,
+    exitDistance: extension,
+    exitVector: d,
+  };
+}
+
+function pointOnRoute(route, targetDistance) {
+  if (targetDistance <= 0) {
+    const vector = vectorBetween(route.points[0], route.points[1]) ?? route.exitVector;
+    return { point: route.points[0], vector };
+  }
+
+  for (let i = 1; i < route.points.length; i += 1) {
+    const startDistance = route.distances[i - 1];
+    const endDistance = route.distances[i];
+    if (targetDistance <= endDistance) {
+      const span = endDistance - startDistance || 1;
+      const t = (targetDistance - startDistance) / span;
+      const start = route.points[i - 1];
+      const end = route.points[i];
+      return {
+        point: {
+          x: start.x + (end.x - start.x) * t,
+          y: start.y + (end.y - start.y) * t,
+        },
+        vector: vectorBetween(start, end) ?? route.exitVector,
+      };
+    }
+  }
+
+  const end = route.points[route.points.length - 1];
+  const overflow = targetDistance - route.distances[route.distances.length - 1];
+  return {
+    point: {
+      x: end.x + route.exitVector.x * overflow,
+      y: end.y + route.exitVector.y * overflow,
+    },
+    vector: route.exitVector,
+  };
+}
+
+function vectorBetween(a, b) {
+  const x = b.x - a.x;
+  const y = b.y - a.y;
+  if (x === 0 && y === 0) return null;
+  return normalizeVector({ x, y });
+}
+
+function normalizeVector(vector) {
+  const length = Math.hypot(vector.x, vector.y) || 1;
+  return { x: vector.x / length, y: vector.y / length };
+}
+
+function distanceBetween(a, b) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 function gridPoint(cell, m, offset = { x: 0, y: 0 }) {
@@ -372,15 +488,19 @@ function releaseArrow(arrow, m) {
   hintId = null;
   arrow.exiting = true;
   arrow.startedAt = performance.now();
+  arrow.exitDuration = 820;
   const d = dirs[arrow.dir];
   const head = gridPoint(getHead(arrow), m);
 
-  for (let i = 0; i < 22; i += 1) {
+  for (let i = 0; i < 28; i += 1) {
+    const drift = 0.6 + i * 0.018;
     particles.push({
       x: head.x - d.x * i * 12,
       y: head.y - d.y * i * 12,
-      r: Math.max(2, 5 - i * 0.1),
-      life: Math.max(0.12, 0.66 - i * 0.022),
+      vx: d.x * drift,
+      vy: d.y * drift,
+      r: Math.max(2, 5.2 - i * 0.1),
+      life: Math.max(0.12, 0.72 - i * 0.018),
     });
   }
   animateArrow(arrow);
@@ -388,7 +508,7 @@ function releaseArrow(arrow, m) {
 
 function animateArrow(arrow) {
   const step = (now) => {
-    arrow.progress = Math.min(1, (now - arrow.startedAt) / 460);
+    arrow.progress = Math.min(1, (now - arrow.startedAt) / arrow.exitDuration);
     if (arrow.progress < 1) {
       requestAnimationFrame(step);
       return;
@@ -459,7 +579,14 @@ function tick(now) {
   }
 
   particles = particles
-    .map((particle) => ({ ...particle, life: particle.life - 0.01 }))
+    .map((particle) => ({
+      ...particle,
+      x: particle.x + (particle.vx ?? 0),
+      y: particle.y + (particle.vy ?? 0),
+      vx: (particle.vx ?? 0) * 0.988,
+      vy: (particle.vy ?? 0) * 0.988,
+      life: particle.life - 0.012,
+    }))
     .filter((particle) => particle.life > 0);
   requestAnimationFrame(tick);
 }
@@ -528,6 +655,15 @@ function isInside(col, row) {
 
 function easeOutCubic(t) {
   return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function smoothstep(edge0, edge1, value) {
+  const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
 }
 
 window.arrowGameDebug = {
