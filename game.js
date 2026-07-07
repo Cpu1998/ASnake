@@ -25,6 +25,8 @@ const dirs = {
   left: { x: -1, y: 0, angle: Math.PI },
 };
 const dirNames = Object.keys(dirs);
+const LEVEL_SEED = 20260707;
+const MAX_LEVEL_ATTEMPTS = 120;
 
 let arrows = [];
 let particles = [];
@@ -44,15 +46,32 @@ function seededRandom(seed) {
 }
 
 function buildLevel() {
-  const rand = seededRandom(20260707);
-  arrows = [];
   particles = [];
   hintId = null;
   lives = 3;
   timeLeft = START_TIME;
   gameOver = false;
-  nextId = 1;
 
+  for (let attempt = 0; attempt < MAX_LEVEL_ATTEMPTS; attempt += 1) {
+    arrows = [];
+    nextId = 1;
+    generateLevelArrows(seededRandom(LEVEL_SEED + attempt * 9973));
+    if (arrows.length > 0 && isLevelSolvable(arrows)) break;
+  }
+
+  if (!arrows.length || !isLevelSolvable(arrows)) {
+    arrows = [];
+    nextId = 1;
+    generateLevelArrows(seededRandom(LEVEL_SEED));
+  }
+
+  updateHearts();
+  updateTimer();
+  showMessage("\u70b9\u51fb\u65e0\u906e\u6321\u7bad\u5934");
+  setTimeout(() => hideMessage(), 900);
+}
+
+function generateLevelArrows(rand) {
   const occupied = new Map();
   const starts = allCells().sort(() => rand() - 0.5);
 
@@ -65,11 +84,6 @@ function buildLevel() {
   }
 
   fillSmallGaps(occupied, rand);
-  makeSureThereAreOpenMoves();
-  updateHearts();
-  updateTimer();
-  showMessage("\u70b9\u51fb\u65e0\u906e\u6321\u7bad\u5934");
-  setTimeout(() => hideMessage(), 900);
 }
 
 function allCells() {
@@ -107,7 +121,7 @@ function growPath(start, targetLength, occupied, rand) {
     stepsSinceTurn = previousDir && previousDir !== picked.name ? 0 : stepsSinceTurn + 1;
     previousDir = picked.name;
 
-    if (path.length >= 2 && outwardDirection(next)) break;
+    if (path.length >= 2 && touchesExit(next, picked.name)) break;
   }
 
   return path;
@@ -189,27 +203,7 @@ function pathStartExitDirection(path) {
 }
 
 function makeSureThereAreOpenMoves() {
-  if (arrows.some((arrow) => !arrow.removed && !arrow.exiting && canExit(arrow).ok)) return;
-
-  if (promoteBoundarySegmentToExit()) return;
-}
-
-function promoteBoundarySegmentToExit() {
-  for (const arrow of activeArrows()) {
-    const boundaryIndex = arrow.path.findIndex((cell, index) => {
-      if (index === 0) return false;
-      const dir = directionBetween(arrow.path[index - 1], cell);
-      return touchesExit(cell, dir);
-    });
-    if (boundaryIndex < 0) continue;
-
-    arrow.path = arrow.path.slice(0, boundaryIndex + 1);
-
-    refreshArrowShape(arrow);
-    if (canExit(arrow).ok) return true;
-  }
-
-  return false;
+  return arrows.some((arrow) => !arrow.removed && !arrow.exiting && canExit(arrow).ok);
 }
 
 function refreshArrowShape(arrow) {
@@ -260,6 +254,46 @@ function canExit(arrow) {
   }
 
   return { ok: blockers.length === 0, blockers };
+}
+
+function isLevelSolvable(sourceArrows) {
+  const activeIds = new Set(sourceArrows.map((arrow) => arrow.id));
+
+  while (activeIds.size > 0) {
+    const cellIndex = buildActiveCellIndex(sourceArrows, activeIds);
+    const open = sourceArrows.find((arrow) => activeIds.has(arrow.id) && canExitInSet(arrow, activeIds, cellIndex));
+    if (!open) return false;
+    activeIds.delete(open.id);
+  }
+
+  return true;
+}
+
+function buildActiveCellIndex(sourceArrows, activeIds) {
+  const cellIndex = new Map();
+
+  for (const arrow of sourceArrows) {
+    if (!activeIds.has(arrow.id)) continue;
+    for (const cell of arrow.cells) cellIndex.set(cell, arrow.id);
+  }
+
+  return cellIndex;
+}
+
+function canExitInSet(arrow, activeIds, cellIndex) {
+  const head = getHead(arrow);
+  const d = dirs[arrow.dir];
+  let col = head.col + d.x;
+  let row = head.row + d.y;
+
+  while (isInside(col, row)) {
+    const id = cellIndex.get(keyOf(col, row));
+    if (id && id !== arrow.id && activeIds.has(id)) return false;
+    col += d.x;
+    row += d.y;
+  }
+
+  return true;
 }
 
 function draw() {
