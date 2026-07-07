@@ -58,7 +58,7 @@ function buildLevel() {
 
   for (const start of starts) {
     if (occupied.has(keyOf(start.col, start.row))) continue;
-    const targetLength = 4 + Math.floor(rand() * 7);
+    const targetLength = 7 + Math.floor(rand() * 9);
     const path = growPath(start, targetLength, occupied, rand);
     if (path.length < 2) continue;
     addArrow(path, occupied);
@@ -86,6 +86,7 @@ function growPath(start, targetLength, occupied, rand) {
   const path = [start];
   const used = new Set([keyOf(start.col, start.row)]);
   let previousDir = null;
+  let stepsSinceTurn = 0;
 
   while (path.length < targetLength) {
     const here = path[path.length - 1];
@@ -96,13 +97,14 @@ function growPath(start, targetLength, occupied, rand) {
         const key = keyOf(next.col, next.row);
         return isInside(next.col, next.row) && !occupied.has(key) && !used.has(key);
       })
-      .sort((a, b) => scoreDirection(b, here, previousDir, rand) - scoreDirection(a, here, previousDir, rand));
+      .sort((a, b) => scoreDirection(b, here, previousDir, stepsSinceTurn, rand) - scoreDirection(a, here, previousDir, stepsSinceTurn, rand));
 
     if (!choices.length) break;
     const picked = choices[0];
     const next = { col: here.col + picked.x, row: here.row + picked.y };
     path.push(next);
     used.add(keyOf(next.col, next.row));
+    stepsSinceTurn = previousDir && previousDir !== picked.name ? 0 : stepsSinceTurn + 1;
     previousDir = picked.name;
 
     if (path.length >= 2 && outwardDirection(next)) break;
@@ -111,19 +113,21 @@ function growPath(start, targetLength, occupied, rand) {
   return path;
 }
 
-function scoreDirection(dir, from, previousDir, rand) {
+function scoreDirection(dir, from, previousDir, stepsSinceTurn, rand) {
   const next = { col: from.col + dir.x, row: from.row + dir.y };
   let score = rand();
-  if (previousDir === dir.name) score += 0.38;
-  if (touchesExit(next, dir.name)) score += 0.55;
-  if (next.col === 0 || next.col === COLS - 1 || next.row === 0 || next.row === ROWS - 1) score += 0.12;
+  if (!previousDir) score += 0.1;
+  else if (previousDir === dir.name) score += Math.max(-0.32, 0.14 - stepsSinceTurn * 0.24);
+  else score += 0.56 + Math.min(0.22, stepsSinceTurn * 0.08);
+  if (touchesExit(next, dir.name)) score += 0.42;
+  if (next.col === 0 || next.col === COLS - 1 || next.row === 0 || next.row === ROWS - 1) score += 0.06;
   return score;
 }
 
 function fillSmallGaps(occupied, rand) {
   for (const cell of allCells()) {
     if (occupied.has(keyOf(cell.col, cell.row)) || rand() < 0.18) continue;
-    const path = growPath(cell, 3 + Math.floor(rand() * 4), occupied, rand);
+    const path = growPath(cell, 4 + Math.floor(rand() * 6), occupied, rand);
     if (path.length >= 2) addArrow(path, occupied);
   }
 }
