@@ -52,6 +52,7 @@ sudo ./deploy-ubuntu.sh
 - 将 `index.html`、`game.js`、`styles.css` 部署到 `/var/www/asnake`。
 - 如果项目中存在 `assets/` 目录，会同步到部署目录。
 - 写入 Nginx 站点配置。
+- 禁用 Ubuntu 自带的 Nginx 默认站点，避免访问服务器 IP 时显示 `Welcome to nginx!`。
 - 执行 `nginx -t` 检查配置。
 - 启用并重载 Nginx。
 

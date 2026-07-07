@@ -8,6 +8,7 @@ PORT="${PORT:-80}"
 DEPLOY_DIR="${DEPLOY_DIR:-/var/www/${APP_NAME}}"
 NGINX_SITE="${NGINX_SITE:-/etc/nginx/sites-available/${APP_NAME}}"
 NGINX_ENABLED="${NGINX_ENABLED:-/etc/nginx/sites-enabled/${APP_NAME}}"
+NGINX_DEFAULT_ENABLED="${NGINX_DEFAULT_ENABLED:-/etc/nginx/sites-enabled/default}"
 
 log() {
   printf '\033[1;32m[deploy]\033[0m %s\n' "$*"
@@ -93,11 +94,17 @@ copy_files() {
 }
 
 write_nginx_site() {
+  local default_server=""
+
+  if [[ "${PORT}" == "80" ]]; then
+    default_server=" default_server"
+  fi
+
   log "Writing Nginx site config: ${NGINX_SITE}"
   cat >"${NGINX_SITE}" <<EOF
 server {
-    listen ${PORT};
-    listen [::]:${PORT};
+    listen ${PORT}${default_server};
+    listen [::]:${PORT}${default_server};
     server_name ${DOMAIN};
 
     root ${DEPLOY_DIR};
@@ -119,6 +126,13 @@ server {
 EOF
 
   ln -sfn "${NGINX_SITE}" "${NGINX_ENABLED}"
+}
+
+disable_default_site() {
+  if [[ -L "${NGINX_DEFAULT_ENABLED}" || -e "${NGINX_DEFAULT_ENABLED}" ]]; then
+    log "Disabling Ubuntu default Nginx site..."
+    rm -f "${NGINX_DEFAULT_ENABLED}"
+  fi
 }
 
 start_nginx() {
@@ -158,6 +172,7 @@ main() {
   install_packages
   copy_files "${project_dir}"
   write_nginx_site
+  disable_default_site
   start_nginx
   print_result
 }
